@@ -3,19 +3,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import warnings
+warnings.filterwarnings("ignore")
 import time
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.svm import SVC
+from sklearn.svm import SVR
+from sklearn.metrics import explained_variance_score, mean_absolute_error, mean_squared_error, mean_squared_log_error, median_absolute_error, r2_score
 
 
 '''
     Author : Mathieu VANDECASTEELE - mathieuvdc.com
 
-    Perform a SVC (SVM) for Classification. Most of the cases, you just need to put X and y for input parameters.
+    Perform a SVR (SVM) for Regression. Most of the cases, you just need to put X and y for input parameters.
     
-    Return : SVC() classifier fit with the best parameters.
+    Return : SVR() classifier fit with the best parameters.
     
     Parameters:
     X : data table with a shape (n, m).
@@ -31,9 +33,9 @@ from sklearn.svm import SVC
     
 '''
 
-def my_SVC(X, y, test_size = 0.20, standardize = True, parameters_grid = {'kernel':('rbf','linear'), 'C':[0.001,0.01,0.1,1,2,5,10,15,20]}, cv_number = 5, njobs_gs = -1, display_gs_details = False, random_state = 42):
+def my_SVR(X, y, test_size = 0.20, standardize = True, parameters_grid = {'kernel':('rbf','linear'), 'C':[0.001,0.01,0.1,1,2,5,10,15,20], 'epsilon':[0.001,0.01,0.1,0.5,1,10]}, cv_number = 5, njobs_gs = -1, display_gs_details = False, random_state = 42):
     
-    print("\n----------BEGIN SVC() FOR CLASSIFICATION----------\n")
+    print("\n----------BEGIN SVR() FOR REGRESSION----------\n")
     print("Shape of X is "+str(X.shape))
     print("Shape of y is "+str(y.shape))
 
@@ -59,23 +61,34 @@ def my_SVC(X, y, test_size = 0.20, standardize = True, parameters_grid = {'kerne
     # First Simple Training
     print("\n--------------------------------------------------")
     print("\nPerform First Simple Training...\n")
-    svc = SVC(gamma="scale")
-    print(svc)
+    svr = SVR(gamma="scale")
+    print(svr)
 
     time1 = time.time()
-    svc.fit(X_train, y_train)
+    svr.fit(X_train, y_train)
     elapsed = time.time() - time1
     print("\nDone ! Time for training : "+str(elapsed)+" seconds.\n") 
 
     # Simple Training Report
-    score = svc.score(X_test, y_test)
+    score = svr.score(X_test, y_test)
     print("Precision/Score on Test Dataset : "+str(score)+"\n")
 
-    y_pred = svc.predict(X_test)
-    print("Classification Report on Test Dataset (y_pred/y_test) :\n")
-    print(classification_report(y_pred, y_test))
-    print("Confusion Matrix on Test Dataset (y_pred/y_test) :\n")
-    print(confusion_matrix(y_pred, y_test))    
+    y_pred = svr.predict(X_test)
+    print("Regression Metrics :\n")
+    print("Explained variance : "+str(explained_variance_score(y_test, y_pred)))
+    print("Mean Absolute Error : "+str(mean_absolute_error(y_test, y_pred)))
+    print("Mean Squared Error : "+str(mean_squared_error(y_test, y_pred)))
+    print("Mean Squared Log Error : "+str(mean_squared_log_error(y_test, y_pred)))
+    print("Median Absolute Error : "+str(median_absolute_error(y_test, y_pred)))
+    print("R2 Score : "+str(r2_score(y_test, y_pred)))
+    
+    plt.figure(figsize=(20,8))
+    plt.plot(y_test, c="r",label='true')
+    plt.plot(y_pred,c='g',label='prediction')
+    plt.ylabel('y-value')
+    plt.title('First Training : True Test Dataset vs Prediction Test Dataset')
+    plt.legend()
+  
     
     # Tuning parameters with GridSearch and Cross-Validation 
     print("\n--------------------------------------------------")
@@ -87,8 +100,8 @@ def my_SVC(X, y, test_size = 0.20, standardize = True, parameters_grid = {'kerne
     # n_jobs for parallel computing. Set to -1 for using all the processors.
     njobs = njobs_gs
     
-    svc = SVC(gamma="scale")
-    gs = GridSearchCV(svc, parameters, cv=cv_number)
+    svr = SVR(gamma="scale")
+    gs = GridSearchCV(svr, parameters, cv=cv_number)
     print(gs)
     
     time2 = time.time()
@@ -105,53 +118,65 @@ def my_SVC(X, y, test_size = 0.20, standardize = True, parameters_grid = {'kerne
     best_parameters = gs.best_estimator_.get_params()
     for param_name in sorted(parameters.keys()):
         print("\t%s: %r" % (param_name, best_parameters[param_name]))
-    
+
     score = gs.score(X_test, y_test)
     print("\nPrecision/Score on Test Dataset : "+str(score)+"\n")
-    
+
     y_pred = gs.predict(X_test)
-    print("Classification Report on Test Dataset (y_pred/y_test) :\n")
-    print(classification_report(y_pred, y_test))
-    print("Confusion Matrix on Test Dataset (y_pred/y_test) :\n")
-    print(confusion_matrix(y_pred, y_test))
+    print("Regression Metrics :\n")
+    print("Explained variance : "+str(explained_variance_score(y_test, y_pred)))
+    print("Mean Absolute Error : "+str(mean_absolute_error(y_test, y_pred)))
+    print("Mean Squared Error : "+str(mean_squared_error(y_test, y_pred)))
+    print("Mean Squared Log Error : "+str(mean_squared_log_error(y_test, y_pred)))
+    print("Median Absolute Error : "+str(median_absolute_error(y_test, y_pred)))
+    print("R2 Score : "+str(r2_score(y_test, y_pred)))
+    
     print("\nAverage training time for one model :") 
     print(str(np.mean(gs.cv_results_['mean_fit_time']))+" seconds.")
 
 
     # All results ("Set to True to see all results forom GridSearchCV")
-    display_gridsearch_details = display_gs_details
-
+    display_gridsearch_details = False
+    
     if display_gridsearch_details :
         print('All results :')
         means = gs.cv_results_['mean_test_score']
         stds = gs.cv_results_['std_test_score']
         for mean, std, params in zip(means, stds, gs.cv_results_['params']):
             print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
-        print('')
         
     # Last Final Training
     print("\n--------------------------------------------------")
     print("\nPerform Last Final Training...\n")
     
     # For parameters you can directly unpack the best params dictionary of the GridSearchCV classifier or write it manually.
-    svc = SVC(gamma='scale', **gs.best_params_)
-    print(svc)
+    svr = SVR(gamma='scale', **gs.best_params_)
+    print(svr)
     
     time3 = time.time()
-    svc.fit(X_train, y_train)
+    svr.fit(X_train, y_train)
     elapsed3 = time.time() - time3
     print("\nDone ! Time for training : "+str(elapsed3)+" seconds.\n") 
 
     # Last Training Report
-    score = svc.score(X_test, y_test)
-    print("Validation score calculated previously for this model : "+str(clf.best_score_))
+    score = svr.score(X_test, y_test)
+    print("Validation score calculated previously for this model : "+str(gs.best_score_))
     print("Precision/Score on Test Dataset : "+str(score)+"\n")
     
-    y_pred = svc.predict(X_test)
-    print("Classification Report on Test Dataset (y_pred/y_test) :\n")
-    print(classification_report(y_pred, y_test))
-    print("Confusion Matrix on Test Dataset (y_pred/y_test) :\n")
-    print(confusion_matrix(y_pred, y_test))
-    print("\n----------DONE----------\n")
+    y_pred = svr.predict(X_test)
+    print("Regression Metrics :\n")
+    print("Explained variance : "+str(explained_variance_score(y_test, y_pred)))
+    print("Mean Absolute Error : "+str(mean_absolute_error(y_test, y_pred)))
+    print("Mean Squared Error : "+str(mean_squared_error(y_test, y_pred)))
+    print("Mean Squared Log Error : "+str(mean_squared_log_error(y_test, y_pred)))
+    print("Median Absolute Error : "+str(median_absolute_error(y_test, y_pred)))
+    print("R2 Score : "+str(r2_score(y_test, y_pred)))
     
-    return svc
+    plt.figure(figsize=(20,8))
+    plt.plot(y_test, c="r",label='true')
+    plt.plot(y_pred,c='g',label='prediction')
+    plt.ylabel('y-value')
+    plt.title('Final Training : True Test Dataset vs Prediction Test Dataset')
+    plt.legend()
+    
+    return svr
